@@ -7,10 +7,12 @@ import { describe, expect, it } from 'vitest';
 import { base } from '../base.js';
 
 describe('base', () => {
-  it('loads perfectionist by the absolute path of a file that exists', () => {
-    const entry = base[0]!.jsPlugins![0] as Exclude<ExternalPluginEntry, string>;
-    expect(entry.name).toBe('perfectionist');
-    expect(path.isAbsolute(entry.specifier)).toBe(true);
-    expect(fs.existsSync(entry.specifier)).toBe(true);
+  it('loads each plugin by the absolute path of a file that exists', () => {
+    const entries = base[0]!.jsPlugins as Exclude<ExternalPluginEntry, string>[];
+    expect(entries.map(({ name }) => name)).toStrictEqual(['core', 'perfectionist']);
+    for (const { specifier } of entries) {
+      expect(path.isAbsolute(specifier)).toBe(true);
+      expect(fs.existsSync(specifier)).toBe(true);
+    }
   });
 });

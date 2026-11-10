@@ -31,6 +31,7 @@ const FIXTURE: Record<string, string> = {
   'generated/sample.ts': SAMPLE,
   'module.mts': 'export const value = { b: 1, a: 2 };\n',
   'sample.ts': SAMPLE,
+  'scripts/build.js': 'export const build = () => 1;\n',
   'tsconfig.json': JSON.stringify({
     compilerOptions: { module: 'nodenext', noEmit: true, strict: true, target: 'ES2022' },
     include: ['**/*.ts', '**/*.mts']
@@ -149,10 +150,14 @@ describe('the configuration under oxlint', () => {
 
   it('runs perfectionist and the type-aware rules, and no file that is ignored', () => {
     const codes = lintWith({});
-    expect(Object.keys(codes).sort()).toStrictEqual(['module.mts', 'sample.ts']);
+    expect(Object.keys(codes).sort()).toStrictEqual(['module.mts', 'sample.ts', 'scripts/build.js']);
     expect(codes['sample.ts']).toContain('perfectionist(sort-objects)');
     expect(codes['sample.ts']).toContain('typescript(no-floating-promises)');
     expect(codes['module.mts']).toStrictEqual(['perfectionist(sort-objects)']);
+  });
+
+  it('runs the core rules from the built plugin, on every file of the base preset', () => {
+    expect(lintWith({})['scripts/build.js']).toStrictEqual(['core(function-declaration)']);
   });
 
   it('reports only rules that are enabled by name', () => {

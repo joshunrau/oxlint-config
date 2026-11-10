@@ -2,14 +2,17 @@ import * as url from 'node:url';
 
 import type { OxlintOverride } from 'oxlint';
 
+import { corePlugin } from '../plugins/index.js';
+
 const PERFECTIONIST_NATURAL = { order: 'asc', type: 'natural' };
 
 /** The rules for every JavaScript and TypeScript file. */
 export const base: OxlintOverride[] = [
   {
     files: ['**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'],
-    // A dependency of this package, so it is loaded by its absolute path rather than resolved from the consumer
     jsPlugins: [
+      corePlugin,
+      // A dependency of this package, so it is loaded by its absolute path rather than resolved from the consumer
       {
         name: 'perfectionist',
         specifier: url.fileURLToPath(import.meta.resolve('eslint-plugin-perfectionist'))
@@ -19,6 +22,14 @@ export const base: OxlintOverride[] = [
     rules: {
       'array-callback-return': 'error',
       'constructor-super': 'error',
+      'core/export-list-order': 'error',
+      'core/function-declaration': 'error',
+      'core/multiline-arrow-body': 'error',
+      'core/no-interface': 'error',
+      'core/no-switch': 'error',
+      'core/no-top-level-let': 'error',
+      'core/node-namespace-import': 'error',
+      'core/require-disable-reason': 'error',
       curly: ['error', 'all'],
       'default-case-last': 'error',
       eqeqeq: 'error',
