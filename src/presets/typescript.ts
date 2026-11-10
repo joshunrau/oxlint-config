@@ -53,7 +53,6 @@ export const typescript: OxlintOverride[] = [
       'typescript/no-unnecessary-type-arguments': 'error',
       'typescript/no-unnecessary-type-assertion': 'error',
       'typescript/no-unnecessary-type-constraint': 'error',
-      'typescript/no-unnecessary-type-conversion': 'error',
       'typescript/no-unnecessary-type-parameters': 'error',
       'typescript/no-unsafe-argument': 'error',
       'typescript/no-unsafe-assignment': 'error',
