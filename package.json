@@ -1,44 +1,51 @@
 {
   "name": "@joshunrau/oxlint-config",
-  "type": "module",
   "version": "0.0.1",
-  "packageManager": "pnpm@11.8.0",
   "description": "Linting configurations for TypeScript projects",
-  "author": "Joshua Unrau",
-  "license": "MIT",
+  "keywords": [
+    "oxlint"
+  ],
   "homepage": "https://github.com/joshunrau/oxlint-config#readme",
+  "bugs": {
+    "url": "https://github.com/joshunrau/oxlint-config/issues"
+  },
+  "license": "MIT",
+  "author": "Joshua Unrau",
   "repository": {
     "type": "git",
     "url": "https://github.com/joshunrau/oxlint-config.git"
   },
-  "bugs": {
-    "url": "https://github.com/joshunrau/oxlint-config/issues"
-  },
-  "keywords": [
-    "oxlint"
+  "files": [
+    "dist"
   ],
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
     "format": "oxfmt",
     "lint": "tsc && oxlint --fix",
     "test": "vitest"
   },
-  "peerDependencies": {
-    "oxlint": "^1.89.0"
+  "dependencies": {
+    "eslint-plugin-perfectionist": "^5.12.1"
   },
   "devDependencies": {
     "@types/node": "24.x",
     "oxfmt": "^0.74.0",
     "typescript": "7.0.x",
     "vitest": "^5.0.3"
-  }
+  },
+  "peerDependencies": {
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2005"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.8.0"
 }

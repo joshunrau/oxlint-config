@@ -20,6 +20,7 @@
     "strict": true,
     "tsBuildInfoFile": ".tsbuildinfo",
     "target": "ES2022",
+    "types": ["node"],
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*", "oxfmt.config.ts", "oxlint.config.ts", "vitest.config.ts"]
