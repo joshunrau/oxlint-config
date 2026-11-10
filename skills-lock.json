@@ -6,6 +6,18 @@
       "sourceType": "github",
       "skillPath": "skills/interview/SKILL.md",
       "computedHash": "6cf86ca51424350f10880c3a2fd3dd018c6682c90dfb81baf66e91615df4a0fa"
+    },
+    "writing-implementation-plans": {
+      "source": "joshunrau/skills",
+      "sourceType": "github",
+      "skillPath": "skills/writing-implementation-plans/SKILL.md",
+      "computedHash": "adb2d52f88c2782d996856255491ffce20cd9ffb32be3a3e22ff9b5e3caa14be"
+    },
+    "writing-normative-prose": {
+      "source": "joshunrau/skills",
+      "sourceType": "github",
+      "skillPath": "skills/writing-normative-prose/SKILL.md",
+      "computedHash": "468e20da67ca84b60a306fd253e39433019f047343b8ab6cbcec440d30d81728"
     }
   }
 }
