@@ -29,7 +29,7 @@
     "build": "tsc -b tsconfig.build.json",
     "format": "oxfmt",
     "lint": "tsc && oxlint --fix",
-    "test": "vitest"
+    "test": "pnpm build && vitest"
   },
   "dependencies": {
     "eslint-plugin-perfectionist": "^5.12.1"
