@@ -7,6 +7,8 @@ import * as url from 'node:url';
 import type { OxlintConfig } from 'oxlint';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { react } from '../features/react.js';
+import { vitest } from '../features/vitest.js';
 import { config } from '../index.js';
 import { base } from '../presets/base.js';
 import { typescript } from '../presets/typescript.js';
@@ -39,6 +41,66 @@ const FIXTURE: Record<string, string> = {
   'untyped.d.ts': "declare module 'untyped' {\n  const value: any;\n  export default value;\n}\n"
 };
 
+const FEATURE_FIXTURE: Record<string, string> = {
+  // A hook called conditionally, in a file without JSX
+  'hooks.ts': 'export function useCount(enabled: boolean) {\n  if (enabled) {\n    useState(0);\n  }\n}\n',
+  'math.spec.ts': [
+    "import { describe, expect, test } from 'vitest';",
+    '',
+    'function add(a: number, b: number, c: number, d: number): number {',
+    '  return a + b + c + d;',
+    '}',
+    '',
+    "describe('add', () => {",
+    "  test('sums', () => {",
+    '    expect(add(1, 2, 3, 4)).toBe(10);',
+    '  });',
+    '});',
+    ''
+  ].join('\n'),
+  'math.ts': 'export function add(a: number, b: number, c: number, d: number): number {\n  return a + b + c + d;\n}\n',
+  // A local function passed to an event prop without the `handle` prefix
+  'view.tsx': [
+    'export const View = () => {',
+    "  const save = () => console.warn('saved');",
+    '  return (',
+    '    <button type="button" onClick={save}>',
+    '      Save',
+    '    </button>',
+    '  );',
+    '};',
+    ''
+  ].join('\n')
+};
+
+/** Write a fixture into a new temporary directory, and return the directory. */
+function writeFixture(files: Record<string, string>): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oxlint-config-'));
+  for (const [name, content] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+    fs.writeFileSync(path.join(root, name), content);
+  }
+  return root;
+}
+
+/** Lint a fixture with the configuration given, and list the reported rule codes per file. */
+function lint(root: string, configuration: OxlintConfig): Record<string, string[]> {
+  const configFile = path.join(root, 'oxlintrc.json');
+  fs.writeFileSync(configFile, JSON.stringify(configuration));
+  const result = childProcess.spawnSync(process.execPath, [OXLINT_BIN, '--format', 'json', '-c', configFile, root], {
+    encoding: 'utf8'
+  });
+  if (result.error ?? (result.status !== 0 && result.status !== 1)) {
+    throw new Error(`oxlint exited with status ${result.status}: ${result.stderr}`, { cause: result.error });
+  }
+  const { diagnostics } = JSON.parse(result.stdout) as { diagnostics: Diagnostic[] };
+  const codes: Record<string, string[]> = {};
+  for (const { code, filename } of diagnostics) {
+    (codes[path.relative(root, filename)] ??= []).push(code);
+  }
+  return codes;
+}
+
 /** The names of the rules that the configuration turns on for some file. */
 function enabledRules(configuration: OxlintConfig): Set<string> {
   const names = new Set<string>();
@@ -53,10 +115,26 @@ function enabledRules(configuration: OxlintConfig): Set<string> {
   return names;
 }
 
-/** The name under which a rule is configured, from the code oxlint reports it by, such as `typescript(no-explicit-any)`. */
-function ruleName(code: string): string {
+/**
+ * The names under which a rule may be configured, from the code oxlint reports it by, such as
+ * `typescript(no-explicit-any)`. oxlint reports a rule that a plugin shares with ESLint or with React Hooks under that
+ * other plugin's name: `typescript/no-empty-function` as `eslint(no-empty-function)` and `react/rules-of-hooks` as
+ * `react-hooks(rules-of-hooks)`.
+ */
+function ruleNames(code: string): string[] {
   const [, plugin, rule] = /^(.+)\((.+)\)$/.exec(code) ?? [];
-  return plugin === 'eslint' ? rule! : `${plugin}/${rule}`;
+  if (plugin === 'eslint') {
+    return [rule!, `typescript/${rule}`];
+  }
+  return plugin === 'react-hooks' ? [`react/${rule}`] : [`${plugin}/${rule}`];
+}
+
+/** The reported codes whose rule the configuration does not enable by any of its names. */
+function unexpectedCodes(configuration: OxlintConfig, codes: Record<string, string[]>): string[] {
+  const enabled = enabledRules(configuration);
+  return Object.values(codes)
+    .flat()
+    .filter((code) => !ruleNames(code).some((name) => enabled.has(name)));
 }
 
 describe('config', () => {
@@ -71,8 +149,32 @@ describe('config', () => {
         typeAware: true
       },
       overrides: [...base, ...typescript],
-      plugins: []
+      plugins: [],
+      settings: {}
     });
+  });
+
+  it('turns a feature on when its key is present, and `true` with its defaults', () => {
+    expect(config({ features: {} })).toStrictEqual(config());
+    // An untyped caller can pass a falsy value, which leaves the feature off
+    expect(config({ features: { react: false as unknown as true } })).toStrictEqual(config());
+    expect(config({ features: { react: true } })).toStrictEqual(config({ features: { react: {} } }));
+    expect(config({ features: { vitest: true } }).overrides).toStrictEqual([...base, ...typescript, ...vitest({})]);
+  });
+
+  it('puts the overrides of the features after the rule sets and before `overrides`', () => {
+    const override = { files: ['**/*.ts'], rules: { eqeqeq: 'off' as const } };
+    const { overrides } = config({ features: { react: true, vitest: true }, overrides: [override] });
+    expect(overrides).toStrictEqual([...base, ...typescript, ...react({}).overrides, ...vitest({}), override]);
+  });
+
+  it('takes the settings of the react rules from the options of `react`', () => {
+    const options = { a11y: { components: { Link: 'a' } }, version: '19' };
+    expect(config({ features: { react: options } }).settings).toStrictEqual({
+      'jsx-a11y': { components: { Link: 'a' } },
+      react: { version: '19' }
+    });
+    expect(config({ features: { react: true } }).settings).toStrictEqual({});
   });
 
   it('adds the patterns of `global.ignore` to the patterns that are always ignored', () => {
@@ -114,34 +216,12 @@ describe('config', () => {
 describe('the configuration under oxlint', () => {
   let root: string;
 
-  /** Lint the fixture with the configuration given, and list the reported rule codes per file. */
-  function lint(configuration: OxlintConfig): Record<string, string[]> {
-    const configFile = path.join(root, 'oxlintrc.json');
-    fs.writeFileSync(configFile, JSON.stringify(configuration));
-    const result = childProcess.spawnSync(process.execPath, [OXLINT_BIN, '--format', 'json', '-c', configFile, root], {
-      encoding: 'utf8'
-    });
-    if (result.error ?? (result.status !== 0 && result.status !== 1)) {
-      throw new Error(`oxlint exited with status ${result.status}: ${result.stderr}`, { cause: result.error });
-    }
-    const { diagnostics } = JSON.parse(result.stdout) as { diagnostics: Diagnostic[] };
-    const codes: Record<string, string[]> = {};
-    for (const { code, filename } of diagnostics) {
-      (codes[path.relative(root, filename)] ??= []).push(code);
-    }
-    return codes;
-  }
-
   function lintWith(options: ConfigOptions): Record<string, string[]> {
-    return lint(config({ ...options, global: { ignore: ['generated/**'], ...options.global } }));
+    return lint(root, config({ ...options, global: { ignore: ['generated/**'], ...options.global } }));
   }
 
   beforeAll(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'oxlint-config-'));
-    for (const [name, content] of Object.entries(FIXTURE)) {
-      fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
-      fs.writeFileSync(path.join(root, name), content);
-    }
+    root = writeFixture(FIXTURE);
   });
 
   afterAll(() => {
@@ -162,10 +242,9 @@ describe('the configuration under oxlint', () => {
 
   it('reports only rules that are enabled by name', () => {
     const configuration = config({ global: { ignore: ['generated/**'] } });
-    const enabled = enabledRules(configuration);
-    const reported = Object.values(lint(configuration)).flat().map(ruleName);
-    expect(reported.length).toBeGreaterThan(0);
-    expect(reported.filter((name) => !enabled.has(name))).toStrictEqual([]);
+    const codes = lint(root, configuration);
+    expect(Object.values(codes).flat().length).toBeGreaterThan(0);
+    expect(unexpectedCodes(configuration, codes)).toStrictEqual([]);
   });
 
   it('allows `any` in a declaration file only', () => {
@@ -183,5 +262,53 @@ describe('the configuration under oxlint', () => {
   it('lets a rule set in `overrides` win over the rule sets', () => {
     const codes = lintWith({ overrides: [{ files: ['**/*.ts'], rules: { 'perfectionist/sort-objects': 'off' } }] });
     expect(codes['sample.ts']).not.toContain('perfectionist(sort-objects)');
+  });
+});
+
+describe('the features under oxlint', () => {
+  let root: string;
+
+  // The fixture's JSX has no React types to check against
+  function lintWith(features: ConfigOptions['features']): Record<string, string[]> {
+    return lint(root, config({ features, global: { typeAware: false } }));
+  }
+
+  beforeAll(() => {
+    root = writeFixture(FEATURE_FIXTURE);
+  });
+
+  afterAll(() => {
+    fs.rmSync(root, { force: true, recursive: true });
+  });
+
+  it('runs no rule of a feature whose key is absent', () => {
+    const codes = Object.values(lintWith({})).flat();
+    expect(codes.filter((code) => /^(jsx|jsx-a11y|react|react-hooks|vitest)\(/u.test(code))).toStrictEqual([]);
+  });
+
+  it('runs the react rules, with the built jsx plugin on JSX files and the hook rules on every file', () => {
+    const codes = lintWith({ react: true });
+    expect(codes['view.tsx']).toStrictEqual(['jsx(handler-names)']);
+    expect(codes['hooks.ts']).toContain('react-hooks(rules-of-hooks)');
+  });
+
+  it('runs the vitest rules on the test files only, with `max-params` off there', () => {
+    const codes = lintWith({ vitest: true });
+    expect(codes['math.spec.ts']).toContain('vitest(consistent-test-it)');
+    expect(codes['math.spec.ts']).not.toContain('eslint(max-params)');
+    expect(codes['math.ts']).toContain('eslint(max-params)');
+  });
+
+  it('runs the vitest rules on the files that `files` names', () => {
+    const codes = lintWith({ vitest: { files: ['**/*.check.ts'] } });
+    expect(codes['math.spec.ts']).not.toContain('vitest(consistent-test-it)');
+    expect(codes['math.spec.ts']).toContain('eslint(max-params)');
+  });
+
+  it('reports only rules that are enabled by name, with every feature on', () => {
+    const configuration = config({ features: { react: true, vitest: true }, global: { typeAware: false } });
+    const codes = lint(root, configuration);
+    expect(Object.values(codes).flat().length).toBeGreaterThan(0);
+    expect(unexpectedCodes(configuration, codes)).toStrictEqual([]);
   });
 });

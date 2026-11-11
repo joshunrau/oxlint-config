@@ -2,6 +2,7 @@ import * as url from 'node:url';
 
 import type { OxlintOverride } from 'oxlint';
 
+import { SCRIPT_EXTENSIONS } from '../constants.js';
 import { corePlugin } from '../plugins/index.js';
 
 const PERFECTIONIST_NATURAL = { order: 'asc', type: 'natural' };
@@ -9,7 +10,7 @@ const PERFECTIONIST_NATURAL = { order: 'asc', type: 'natural' };
 /** The rules for every JavaScript and TypeScript file. */
 export const base: OxlintOverride[] = [
   {
-    files: ['**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'],
+    files: [`**/*.${SCRIPT_EXTENSIONS}`],
     jsPlugins: [
       corePlugin,
       // A dependency of this package, so it is loaded by its absolute path rather than resolved from the consumer
